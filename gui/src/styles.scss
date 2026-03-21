@@ -1,0 +1,208 @@
+@import "tailwindcss";
+@source "../src/**/*.ts";
+@source "../src/**/*.html";
+
+@import 'primeicons/primeicons.css';
+
+:root {
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #0d0f14;
+  color: #e2e8f0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow: hidden;
+}
+
+:root {
+  --p-primary-color: #6366f1;
+  --p-primary-contrast-color: #ffffff;
+  --p-primary-hover-color: #4f46e5;
+  --p-surface-0: #0d0f14;
+  --p-surface-50: #13161e;
+  --p-surface-100: #1a1e2a;
+  --p-surface-200: #222736;
+  --p-surface-300: #2a3145;
+  --p-surface-400: #374151;
+  --p-surface-500: #6b7280;
+  --p-surface-600: #9ca3af;
+  --p-surface-700: #d1d5db;
+  --p-surface-800: #e5e7eb;
+  --p-surface-900: #f3f4f6;
+  --p-surface-950: #f9fafb;
+  --p-content-border-color: #2a3145;
+  --p-content-hover-background: #1a1e2a;
+  --p-text-color: #e2e8f0;
+  --p-text-muted-color: #94a3b8;
+}
+
+.p-card {
+  background: #13161e !important;
+  border: 1px solid #2a3145 !important;
+  border-radius: 12px !important;
+  color: #e2e8f0 !important;
+}
+
+.p-button.p-button-primary {
+  background: #6366f1 !important;
+  border-color: #6366f1 !important;
+}
+.p-button.p-button-primary:hover {
+  background: #4f46e5 !important;
+  border-color: #4f46e5 !important;
+}
+
+.p-inputtext, .p-textarea, .p-password input {
+  background: #1a1e2a !important;
+  border-color: #2a3145 !important;
+  color: #e2e8f0 !important;
+  border-radius: 8px !important;
+}
+.p-inputtext:focus, .p-textarea:focus {
+  border-color: #6366f1 !important;
+  box-shadow: 0 0 0 2px rgba(99,102,241,0.2) !important;
+}
+
+.p-select, .p-select-panel {
+  background: #1a1e2a !important;
+  border-color: #2a3145 !important;
+  color: #e2e8f0 !important;
+}
+
+.p-dialog {
+  background: #13161e !important;
+  border: 1px solid #2a3145 !important;
+  border-radius: 12px !important;
+}
+.p-dialog .p-dialog-header {
+  background: #13161e !important;
+  color: #e2e8f0 !important;
+  border-bottom: 1px solid #2a3145 !important;
+  border-radius: 12px 12px 0 0 !important;
+}
+.p-dialog .p-dialog-content {
+  background: #13161e !important;
+  color: #e2e8f0 !important;
+}
+.p-dialog .p-dialog-footer {
+  background: #13161e !important;
+  border-top: 1px solid #2a3145 !important;
+  border-radius: 0 0 12px 12px !important;
+}
+
+.p-tag.p-tag-success { background: rgba(34,197,94,0.15) !important; color: #22c55e !important; }
+.p-tag.p-tag-danger { background: rgba(239,68,68,0.15) !important; color: #ef4444 !important; }
+.p-tag.p-tag-warning { background: rgba(234,179,8,0.15) !important; color: #eab308 !important; }
+.p-tag.p-tag-info { background: rgba(99,102,241,0.15) !important; color: #818cf8 !important; }
+.p-tag.p-tag-secondary { background: rgba(148,163,184,0.15) !important; color: #94a3b8 !important; }
+
+.p-toast .p-toast-message {
+  background: #1a1e2a !important;
+  border: 1px solid #2a3145 !important;
+  color: #e2e8f0 !important;
+}
+
+.p-datatable {
+  .p-datatable-header { background: #13161e !important; border-color: #2a3145 !important; }
+  .p-datatable-thead > tr > th { background: #1a1e2a !important; color: #94a3b8 !important; border-color: #2a3145 !important; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+  .p-datatable-tbody > tr { background: #13161e !important; border-bottom: 1px solid #1a1e2a !important; transition: background 0.15s; }
+  .p-datatable-tbody > tr:hover { background: #1a1e2a !important; }
+  .p-datatable-tbody > tr > td { border-color: #1a1e2a !important; color: #e2e8f0 !important; }
+}
+
+.p-checkbox .p-checkbox-box {
+  background: #1a1e2a !important;
+  border-color: #2a3145 !important;
+}
+.p-checkbox.p-highlight .p-checkbox-box {
+  background: #6366f1 !important;
+  border-color: #6366f1 !important;
+}
+
+.p-tabview {
+  .p-tabview-nav { background: transparent !important; border-color: #2a3145 !important; }
+  .p-tabview-nav li .p-tabview-nav-link { background: transparent !important; color: #94a3b8 !important; border-color: transparent !important; }
+  .p-tabview-nav li.p-highlight .p-tabview-nav-link { color: #818cf8 !important; border-color: #6366f1 !important; }
+  .p-tabview-panels { background: transparent !important; padding: 1.5rem 0 0; }
+}
+
+.p-progressbar {
+  background: #1a1e2a !important;
+  border-radius: 4px !important;
+  .p-progressbar-value { background: #6366f1 !important; border-radius: 4px !important; }
+}
+
+.terminal-output {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  background: #060810;
+  color: #cdd6f4;
+  padding: 1rem 1.25rem;
+  border-radius: 8px;
+  overflow-y: auto;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-all;
+  border: 1px solid #1a1e2a;
+}
+
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2a3145; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #374151; }
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  color: #94a3b8;
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+
+  &:hover { background: #1a1e2a; color: #e2e8f0; }
+  &.active { background: rgba(99,102,241,0.12); color: #818cf8; }
+  .nav-icon { font-size: 1rem; width: 20px; text-align: center; }
+}
+
+.stat-card {
+  background: #13161e;
+  border: 1px solid #2a3145;
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  transition: border-color 0.15s;
+
+  &:hover { border-color: #374151; }
+
+  .stat-label { font-size: 0.8rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+  .stat-value { font-size: 1.75rem; font-weight: 700; color: #e2e8f0; }
+  .stat-icon { font-size: 1.5rem; }
+}
+
+label {
+  font-size: 0.85rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.section-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  margin-bottom: 0.25rem;
+}
+
+.section-desc {
+  font-size: 0.8rem;
+  color: #64748b;
+}

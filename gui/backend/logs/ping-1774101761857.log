@@ -1,0 +1,17 @@
+{
+  "jobId": "ping-1774101761857",
+  "command": "ansible",
+  "args": [
+    "-i",
+    "inventory.ini",
+    "vps",
+    "-m",
+    "ping"
+  ],
+  "startedAt": "2026-03-21T14:02:41.891Z",
+  "status": "failed",
+  "output": [],
+  "error": "spawn ansible ENOENT",
+  "finishedAt": "2026-03-21T14:02:41.956Z",
+  "exitCode": -2
+}

@@ -1,0 +1,14 @@
+.DS_Store
+*.retry
+
+# Ansible vault - never commit the decrypted file
+group_vars/vps/vault.yml
+
+# Local file with real credentials (use group_vars instead)
+secure-server.yml
+
+# Local logs
+*.log
+
+# Plaintext vault password file
+.vault_pass

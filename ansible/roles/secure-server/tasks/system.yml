@@ -1,0 +1,6 @@
+---
+- name: Update and upgrade system packages
+  apt:
+    update_cache: yes
+    upgrade: dist
+    cache_valid_time: 3600

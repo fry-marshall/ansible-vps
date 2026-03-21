@@ -1,0 +1,21 @@
+---
+- name: Harden SSH configuration
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+    backup: yes
+  loop:
+    - regexp: "^#?PasswordAuthentication"
+      line: "PasswordAuthentication no"
+    - regexp: "^#?PermitRootLogin"
+      line: "PermitRootLogin no"
+    - regexp: "^#?X11Forwarding"
+      line: "X11Forwarding no"
+    - regexp: "^#?Port "
+      line: "Port {{ ssh_port }}"
+    - regexp: "^#?UseDNS"
+      line: "UseDNS no"
+    - regexp: "^#?GSSAPIAuthentication"
+      line: "GSSAPIAuthentication no"
+  notify: restart ssh

@@ -1,0 +1,7 @@
+---
+- name: Secure and configure a fresh VPS
+  hosts: vps
+  become: yes
+
+  roles:
+    - secure-server

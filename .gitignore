@@ -1,0 +1,15 @@
+# Ansible
+ansible/group_vars/vps/vault.yml
+ansible/*.retry
+
+# GUI
+gui/node_modules/
+gui/dist/
+gui/backend/node_modules/
+gui/backend/logs/
+gui/.angular/
+
+# Misc
+.DS_Store
+*.log
+/tmp/

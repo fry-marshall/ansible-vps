@@ -1,0 +1,22 @@
+---
+# Non-root user created on the server
+deploy_user: deploy
+
+# SSH port (non-standard to reduce bot noise)
+ssh_port: 1024
+
+# Ports opened in the firewall
+allowed_ports:
+  - "{{ ssh_port }}"
+  - "80"
+  - "443"
+
+# SMTP configuration (credentials stored in vault.yml)
+smtp_host: smtp.gmail.com
+smtp_port: 587
+smtp_user: "{{ vault_smtp_user }}"
+smtp_password: "{{ vault_smtp_password }}"
+alert_email: "{{ vault_alert_email }}"
+
+# SSH public key for the deploy user (not a secret)
+deploy_user_pubkey: "{{ vault_deploy_user_pubkey }}"

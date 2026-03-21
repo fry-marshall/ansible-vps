@@ -1,0 +1,10 @@
+# Copy this file to vault.yml and encrypt it:
+#   cp group_vars/vps/vault.yml.example group_vars/vps/vault.yml
+#   ansible-vault encrypt group_vars/vps/vault.yml
+
+vault_smtp_user: your@gmail.com
+vault_smtp_password: your_gmail_app_password
+vault_alert_email: your@gmail.com
+
+# Content of your SSH public key (~/.ssh/id_ed25519.pub)
+vault_deploy_user_pubkey: "ssh-ed25519 AAAA... your@machine"

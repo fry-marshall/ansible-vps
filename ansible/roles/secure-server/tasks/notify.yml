@@ -1,0 +1,44 @@
+---
+- name: Install msmtp
+  apt:
+    name: msmtp
+    state: present
+    update_cache: yes
+
+- name: Configure msmtp
+  copy:
+    dest: /etc/msmtprc
+    mode: "0600"
+    content: |
+      defaults
+      auth           on
+      tls            on
+      tls_trust_file /etc/ssl/certs/ca-certificates.crt
+      logfile        /var/log/msmtp.log
+
+      account        default
+      host           {{ smtp_host }}
+      port           {{ smtp_port }}
+      from           {{ smtp_user }}
+      user           {{ smtp_user }}
+      password       {{ smtp_password }}
+
+- name: Deploy SSH login notification script
+  copy:
+    dest: /usr/local/bin/ssh-login-notify.sh
+    mode: "0755"
+    content: |
+      #!/bin/bash
+      [ "$PAM_TYPE" = "open_session" ] || exit 0
+
+      HOST=$(hostname)
+      DATE=$(date '+%Y-%m-%d %H:%M:%S %Z')
+
+      echo -e "Subject: SSH Login - ${HOST}\n\nNew SSH session opened on ${HOST}\n\nUser:   ${PAM_USER}\nFrom:   ${PAM_RHOST}\nDate:   ${DATE}" \
+        | msmtp {{ alert_email }}
+
+- name: Disable SSH login notifications via PAM
+  lineinfile:
+    path: /etc/pam.d/sshd
+    line: "session optional pam_exec.so /usr/local/bin/ssh-login-notify.sh"
+    state: absent

@@ -1,0 +1,61 @@
+---
+- name: Install fail2ban and mail utilities
+  apt:
+    name:
+      - fail2ban
+      - msmtp
+      - msmtp-mta
+      - bsd-mailx
+    state: present
+
+- name: Configure msmtp for SMTP email alerts
+  copy:
+    dest: /etc/msmtprc
+    content: |
+      defaults
+      auth on
+      tls on
+      tls_trust_file /etc/ssl/certs/ca-certificates.crt
+      logfile /var/log/msmtp.log
+
+      account default
+      host {{ smtp_host }}
+      port {{ smtp_port }}
+      from {{ smtp_user }}
+      user {{ smtp_user }}
+      password {{ smtp_password }}
+      syslog on
+    owner: root
+    group: mail
+    mode: "0640"
+
+- name: Create msmtp log file
+  file:
+    path: /var/log/msmtp.log
+    state: touch
+    owner: root
+    group: adm
+    mode: "0644"
+
+- name: Configure fail2ban jail
+  copy:
+    dest: /etc/fail2ban/jail.local
+    content: |
+      [DEFAULT]
+      destemail = {{ alert_email }}
+      sender = {{ smtp_user }}
+      mta = mail
+      action = %(action_mwl)s
+      banaction = ufw
+
+      [sshd]
+      enabled = true
+      port = {{ ssh_port }}
+    mode: "0644"
+  notify: restart fail2ban
+
+- name: Ensure fail2ban is started and enabled
+  service:
+    name: fail2ban
+    state: started
+    enabled: yes

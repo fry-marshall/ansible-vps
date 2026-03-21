@@ -1,0 +1,9 @@
+---
+- import_tasks: system.yml
+- import_tasks: updates.yml
+- import_tasks: user.yml
+- import_tasks: ssh.yml
+- import_tasks: firewall.yml
+- import_tasks: fail2ban.yml
+- import_tasks: notify.yml
+- import_tasks: docker.yml

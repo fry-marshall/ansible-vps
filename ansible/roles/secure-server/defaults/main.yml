@@ -1,0 +1,7 @@
+---
+deploy_user: deploy
+ssh_port: 1024
+allowed_ports:
+  - "{{ ssh_port }}"
+  - "80"
+  - "443"
