@@ -27,21 +27,80 @@ function sshExec(conn, cmd) {
   });
 }
 
-// PTY-aware exec: allocates a pseudo-terminal so PAM doesn't block expired-password sessions.
-// With PTY, stdout/stderr are merged into a single stream.
-function sshExecPty(conn, cmd) {
+// Shell-based password change: handles the PAM forced-password-change flow via a PTY shell.
+// Works whether the password is expired (server shows prompts immediately) or not (runs chpasswd).
+function sshShellChangePassword(conn, username, currentPassword, newPassword) {
   return new Promise((resolve, reject) => {
-    conn.exec(cmd, { pty: true }, (err, stream) => {
+    conn.shell({ term: 'vt100', cols: 220 }, (err, stream) => {
       if (err) return reject(err);
-      let stdout = '';
-      stream.on('data', d => stdout += d.toString());
-      stream.on('close', (code) => resolve({ code, stdout, stderr: '' }));
+
+      let output = '';
+      let stage = 'init';
+      let settled = false;
+
+      const settle = (ok, msg) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        stream.end();
+        ok ? resolve({ ok: true, output }) : reject(new Error(msg));
+      };
+
+      const timer = setTimeout(() => settle(false, 'Timeout: pas de réponse du serveur'), 25000);
+
+      const write = (text) => setTimeout(() => { if (!settled) stream.write(text + '\n'); }, 150);
+
+      stream.on('data', (data) => {
+        const text = data.toString();
+        output += text;
+
+        // Expired password: server forces change immediately
+        if (/Current password:|current\) UNIX password:/i.test(text) && stage === 'init') {
+          stage = 'current'; write(currentPassword); return;
+        }
+        if (/New password:|Enter new UNIX password:/i.test(text) && stage === 'current') {
+          stage = 'new'; write(newPassword); return;
+        }
+        if (/Retype new password:|Retype new UNIX password:/i.test(text) && stage === 'new') {
+          stage = 'confirm'; write(newPassword); return;
+        }
+
+        // Normal shell prompt (password not expired) — use chpasswd
+        if (/[#$]\s*$/.test(text.trim()) && stage === 'init') {
+          stage = 'chpasswd';
+          const safeNew = newPassword.replace(/'/g, "'\\''");
+          write(`echo '${username}:${safeNew}' | chpasswd && echo '__PWD_OK__'`);
+          return;
+        }
+
+        if (text.includes('__PWD_OK__')) { settle(true, 'ok'); return; }
+
+        // Success after interactive change
+        if (/password updated successfully|passwd: password updated/i.test(text)) { settle(true, 'ok'); return; }
+        if (stage === 'confirm' && /[#$]\s*$/.test(text.trim())) { settle(true, 'ok'); return; }
+
+        // Failure: server rejected the password and loops back to "New password:"
+        if ((stage === 'confirm' || stage === 'new') &&
+            /The password has not been changed|BAD PASSWORD|too short|too simple|dictionary|must differ|same as/i.test(text)) {
+          const reason = text.trim().split(/\r?\n/).filter(l => l.trim() && !/^$/.test(l)).pop() || 'Mot de passe rejeté';
+          settle(false, reason);
+          return;
+        }
+        if (/passwd: Authentication token manipulation error/i.test(text)) {
+          settle(false, 'Erreur PAM — mot de passe rejeté par la politique du serveur');
+        }
+      });
+
+      stream.on('close', () => {
+        if (!settled) settle(output.includes('updated') || output.includes('__PWD_OK__'), 'Connexion fermée');
+      });
+      stream.on('error', (e) => settle(false, e.message));
     });
   });
 }
 
-function isPasswordExpired(text) {
-  return /password has expired|chfn|You are required to change your password/i.test(text);
+function isPasswordExpired(stderr) {
+  return /password has expired|Password change required/i.test(stderr);
 }
 
 // Liste les clés publiques SSH disponibles sur la machine
@@ -69,18 +128,19 @@ router.post('/test', async (req, res) => {
 
   try {
     const conn = await sshConnect({ host, port: Number(port), username, password });
-    // Use PTY so PAM doesn't block if password is expired
-    const result = await sshExecPty(conn, 'uname -a && hostname 2>&1; echo "EXIT:$?"');
+    // No PTY: if password is expired PAM writes the warning to stderr and exits with code 1.
+    // We detect that and still return ok=true with passwordExpired flag.
+    const result = await sshExec(conn, 'uname -a && hostname');
     conn.end();
 
-    const output = result.stdout.trim();
-
-    // Detect expired password — connection succeeded but commands are blocked
-    if (isPasswordExpired(output)) {
-      return res.json({ ok: true, output, passwordExpired: true });
+    if (isPasswordExpired(result.stderr)) {
+      return res.json({ ok: true, output: result.stderr.trim(), passwordExpired: true });
+    }
+    if (result.code !== 0) {
+      return res.status(400).json({ ok: false, error: result.stderr || result.stdout || 'Commande échouée' });
     }
 
-    res.json({ ok: true, output });
+    res.json({ ok: true, output: result.stdout.trim() });
   } catch (err) {
     res.status(400).json({ ok: false, error: err.message });
   }
@@ -95,16 +155,9 @@ router.post('/change-password', async (req, res) => {
 
   try {
     const conn = await sshConnect({ host, port: Number(port), username, password: currentPassword });
-    // PTY required: when the password is expired PAM blocks non-TTY exec.
-    // chpasswd reads from stdin and doesn't need an interactive TTY once a PTY is allocated.
-    const safeNew = newPassword.replace(/'/g, "'\\''");
-    const result = await sshExecPty(conn, `echo '${username}:${safeNew}' | chpasswd && echo "DONE"`);
+    // Use shell + PTY: handles both expired (forced interactive) and normal (chpasswd) cases.
+    await sshShellChangePassword(conn, username, currentPassword, newPassword);
     conn.end();
-
-    const output = result.stdout || '';
-    if (result.code !== 0 && !output.includes('DONE')) {
-      return res.status(400).json({ ok: false, error: output || 'Changement échoué' });
-    }
     res.json({ ok: true });
   } catch (err) {
     res.status(400).json({ ok: false, error: err.message });
@@ -130,11 +183,11 @@ router.post('/copy-key', async (req, res) => {
       'chmod 600 ~/.ssh/authorized_keys'
     ].join(' && ');
 
-    const result = await sshExecPty(conn, cmd);
+    const result = await sshExec(conn, cmd);
     conn.end();
 
     if (result.code !== 0) {
-      return res.status(400).json({ ok: false, error: result.stdout || 'Copie échouée' });
+      return res.status(400).json({ ok: false, error: result.stderr || result.stdout || 'Copie échouée' });
     }
     res.json({ ok: true });
   } catch (err) {
