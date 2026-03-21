@@ -60,6 +60,11 @@ const STATUS_ORDER = ['new', 'ssh-ok', 'password-changed', 'key-copied', 'config
     .section-title { font-size:1.1rem; font-weight:700; color:#e2e8f0; margin:0 0 6px; }
     .section-sub { font-size:0.85rem; color:#64748b; margin:0 0 24px; }
     .row2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .key-textarea { width:100%; box-sizing:border-box; background:#0d0f14; border:1px solid #2a3145; border-radius:8px; padding:10px 12px; color:#e2e8f0; font-family:monospace; font-size:0.75rem; resize:vertical; }
+    .key-textarea:focus { border-color:#6366f1; outline:none; }
+    .mode-btn { background:#0d0f14; border:1px solid #2a3145; border-radius:8px; padding:8px 16px; color:#64748b; font-size:0.82rem; cursor:pointer; transition:all 0.15s; }
+    .mode-btn:hover { border-color:#374151; color:#94a3b8; }
+    .mode-btn.active { background:rgba(99,102,241,0.1); border-color:#6366f1; color:#818cf8; }
   `],
   template: `
     <p-toast />
@@ -195,24 +200,43 @@ const STATUS_ORDER = ['new', 'ssh-ok', 'password-changed', 'key-copied', 'config
       @if (currentStep() === 3) {
         <div class="card">
           <p class="section-title">Copier la clé SSH</p>
-          <p class="section-sub">Copie ta clé publique SSH sur le serveur pour un accès sans mot de passe.</p>
+          <p class="section-sub">Copie une clé publique SSH sur le serveur pour un accès sans mot de passe.</p>
 
-          <div class="field">
-            <label>Sélectionne une clé publique</label>
-            @if (sshKeys().length === 0) {
-              <div class="alert alert-error"><i class="pi pi-exclamation-triangle" style="margin-right:8px"></i>Aucune clé SSH trouvée dans ~/.ssh/. Génère une clé avec <code>ssh-keygen -t ed25519</code>.</div>
-            } @else {
-              <div class="key-list">
-                @for (key of sshKeys(); track key.name) {
-                  <div class="key-item" [class.selected]="f3.selectedKey?.name === key.name" (click)="f3.selectedKey = key">
-                    <div class="key-name"><i class="pi pi-key" style="margin-right:8px;color:#818cf8"></i>{{ key.name }}</div>
-                    <div class="key-path">{{ key.path }}</div>
-                    <div class="key-content">{{ key.content }}</div>
-                  </div>
-                }
-              </div>
-            }
+          <!-- Toggle machine source -->
+          <div style="display:flex;gap:8px;margin-bottom:20px">
+            <button class="mode-btn" [class.active]="f3.mode === 'local'" (click)="f3.mode = 'local'">
+              <i class="pi pi-desktop" style="margin-right:6px"></i> Cette machine
+            </button>
+            <button class="mode-btn" [class.active]="f3.mode === 'other'" (click)="f3.mode = 'other'">
+              <i class="pi pi-plus-circle" style="margin-right:6px"></i> Autre machine
+            </button>
           </div>
+
+          @if (f3.mode === 'local') {
+            <div class="field">
+              <label>Sélectionne une clé publique locale</label>
+              @if (sshKeys().length === 0) {
+                <div class="alert alert-error"><i class="pi pi-exclamation-triangle" style="margin-right:8px"></i>Aucune clé trouvée dans ~/.ssh/. Génère-en une avec <code>ssh-keygen -t ed25519</code>.</div>
+              } @else {
+                <div class="key-list">
+                  @for (key of sshKeys(); track key.name) {
+                    <div class="key-item" [class.selected]="f3.selectedKey?.name === key.name" (click)="f3.selectedKey = key">
+                      <div class="key-name"><i class="pi pi-key" style="margin-right:8px;color:#818cf8"></i>{{ key.name }}</div>
+                      <div class="key-path">{{ key.path }}</div>
+                      <div class="key-content">{{ key.content }}</div>
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          } @else {
+            <div class="field">
+              <label>Clé publique à ajouter</label>
+              <textarea class="key-textarea" [(ngModel)]="f3.pastedKey" rows="4"
+                placeholder="ssh-ed25519 AAAA... utilisateur@autre-machine"></textarea>
+              <div class="hint">Colle le contenu du fichier <code>~/.ssh/id_ed25519.pub</code> de l'autre machine.</div>
+            </div>
+          }
 
           <div class="field" style="margin-top:16px">
             <label>Mot de passe root (pour la copie)</label>
@@ -233,7 +257,10 @@ const STATUS_ORDER = ['new', 'ssh-ok', 'password-changed', 'key-copied', 'config
               @if (host()?.status === 'key-copied' || host()?.status === 'configured') {
                 <p-button label="Passer cette étape" [outlined]="true" size="small" (onClick)="nextStep()"></p-button>
               }
-              <p-button label="Copier la clé" icon="pi pi-upload" [loading]="loading()" [disabled]="!f3.selectedKey" (onClick)="step3CopyKey()"></p-button>
+              <p-button label="Copier la clé" icon="pi pi-upload" [loading]="loading()"
+                [disabled]="f3.mode === 'local' ? !f3.selectedKey : !f3.pastedKey.trim()"
+                (onClick)="step3CopyKey()">
+              </p-button>
             </div>
           </div>
         </div>
@@ -271,6 +298,43 @@ const STATUS_ORDER = ['new', 'ssh-ok', 'password-changed', 'key-copied', 'config
               <p-password [(ngModel)]="f4.vaultPassword" [feedback]="false" [toggleMask]="true" styleClass="w-full" inputStyleClass="w-full" placeholder="Laisse vide si pas de vault"></p-password>
               <div class="hint">Requis si ton vault.yml est chiffré.</div>
             </div>
+          </div>
+
+          <!-- SSH Config alias -->
+          <div style="border-top:1px solid #1a1e2a;margin:20px 0;padding-top:20px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+              <div>
+                <p style="font-size:0.85rem;font-weight:600;color:#94a3b8;margin:0 0 2px">
+                  <i class="pi pi-terminal" style="margin-right:6px;color:#818cf8"></i>Alias SSH (optionnel)
+                </p>
+                <p style="font-size:0.72rem;color:#475569;margin:0">Pour te connecter avec <code style="color:#4ade80">ssh {{ f4.sshAlias || 'mon_vps' }}</code> au lieu de l'IP</p>
+              </div>
+            </div>
+            <div class="row2">
+              <div class="field">
+                <label>Alias</label>
+                <input pInputText [(ngModel)]="f4.sshAlias" placeholder="mon_vps" style="font-family:monospace" />
+              </div>
+              <div class="field" style="display:flex;align-items:flex-end">
+                <p-button label="Appliquer dans ~/.ssh/config" icon="pi pi-save" size="small"
+                  [outlined]="true" [loading]="sshConfigLoading()" [disabled]="!f4.sshAlias"
+                  (onClick)="step4SaveSshConfig()">
+                </p-button>
+              </div>
+            </div>
+            @if (sshConfigMsg()) {
+              <div class="alert" style="margin-top:0" [class.alert-success]="!sshConfigError()" [class.alert-error]="sshConfigError()">
+                <i class="pi" [class.pi-check-circle]="!sshConfigError()" [class.pi-times-circle]="sshConfigError()" style="margin-right:8px"></i>
+                {{ sshConfigMsg() }}
+              </div>
+            }
+            @if (f4.sshAlias) {
+              <pre style="background:#0a0c10;border-radius:8px;padding:10px 14px;font-size:0.72rem;color:#64748b;margin:8px 0 0;overflow-x:auto">Host {{ f4.sshAlias }}
+    HostName {{ host()?.ip }}
+    User {{ f4.deployUser || 'deploy' }}
+    Port {{ f4.sshPort || 1024 }}
+    IdentityFile {{ f4.privateKeyPath || '~/.ssh/id_ed25519' }}</pre>
+            }
           </div>
 
           <div class="actions">
@@ -354,8 +418,14 @@ export class SetupComponent implements OnInit, OnDestroy, AfterViewChecked {
   f0 = { ip: '', label: '', rootPort: 22 };
   f1 = { password: '', output: '', passwordExpired: false };
   f2 = { currentPassword: '', newPassword: '', confirmPassword: '' };
-  f3: { selectedKey: SshKey | null; password: string } = { selectedKey: null, password: '' };
-  f4 = { deployUser: 'deploy', sshPort: 1024, privateKeyPath: '~/.ssh/id_ed25519', vaultPassword: '' };
+  f3: { selectedKey: SshKey | null; password: string; mode: 'local' | 'other'; pastedKey: string } = {
+    selectedKey: null, password: '', mode: 'local', pastedKey: ''
+  };
+  f4 = { deployUser: 'deploy', sshPort: 1024, privateKeyPath: '~/.ssh/id_ed25519', vaultPassword: '', sshAlias: '' };
+
+  sshConfigLoading = signal(false);
+  sshConfigMsg = signal('');
+  sshConfigError = signal(false);
 
   wizardSteps = [
     { key: 'info',     label: 'Serveur' },
@@ -392,6 +462,7 @@ export class SetupComponent implements OnInit, OnDestroy, AfterViewChecked {
             if (h.deployUser) this.f4.deployUser = h.deployUser;
             if (h.sshPort) this.f4.sshPort = h.sshPort;
             if (h.privateKeyPath) this.f4.privateKeyPath = h.privateKeyPath;
+            if (!this.f4.sshAlias) this.f4.sshAlias = h.label.toLowerCase().replace(/[^a-z0-9]/g, '_');
           }
         }
       });
@@ -502,37 +573,47 @@ export class SetupComponent implements OnInit, OnDestroy, AfterViewChecked {
   // ─── STEP 3 ─────────────────────────────────────────────────────────────────
   step3CopyKey() {
     const h = this.host();
-    if (!h || !this.f3.selectedKey || !this.f3.password) {
-      this.msg.add({ severity: 'warn', summary: 'Champs manquants', detail: 'Sélectionne une clé et saisis le mot de passe' });
+    const isLocal = this.f3.mode === 'local';
+    const publicKey = isLocal ? this.f3.selectedKey?.content : this.f3.pastedKey.trim();
+
+    if (!h || !publicKey || !this.f3.password) {
+      this.msg.add({ severity: 'warn', summary: 'Champs manquants', detail: isLocal ? 'Sélectionne une clé et saisis le mot de passe' : 'Colle une clé publique et saisis le mot de passe' });
       return;
     }
     this.step3Error.set('');
     this.loading.set(true);
     this.api.copyKey({
       host: h.ip, port: h.rootPort, username: 'root',
-      password: this.f3.password, publicKey: this.f3.selectedKey.content
+      password: this.f3.password, publicKey
     }).subscribe({
       next: () => {
-        // Verify the key works
-        const privPath = this.f3.selectedKey!.path.replace('.pub', '');
-        this.api.verifyKey({ host: h.ip, port: h.rootPort, username: 'root', privateKeyPath: privPath }).subscribe({
-          next: res => {
-            this.loading.set(false);
-            if (res.ok) {
-              // Save key path for ansible use
-              this.f4.privateKeyPath = privPath;
-              this.api.updateHost(h.id, { status: 'key-copied', privateKeyPath: privPath }).subscribe({ next: updated => this.host.set(updated) });
-              this.msg.add({ severity: 'success', summary: 'Clé copiée et vérifiée !' });
-              setTimeout(() => this.nextStep(), 800);
-            } else {
-              this.step3Error.set('Clé copiée mais la vérification a échoué.');
+        if (isLocal && this.f3.selectedKey) {
+          // Verify local key works (we have the private key path)
+          const privPath = this.f3.selectedKey.path.replace('.pub', '');
+          this.api.verifyKey({ host: h.ip, port: h.rootPort, username: 'root', privateKeyPath: privPath }).subscribe({
+            next: res => {
+              this.loading.set(false);
+              if (res.ok) {
+                this.f4.privateKeyPath = privPath;
+                this.api.updateHost(h.id, { status: 'key-copied', privateKeyPath: privPath }).subscribe({ next: updated => this.host.set(updated) });
+                this.msg.add({ severity: 'success', summary: 'Clé copiée et vérifiée !' });
+                setTimeout(() => this.nextStep(), 800);
+              } else {
+                this.step3Error.set('Clé copiée mais la vérification a échoué.');
+              }
+            },
+            error: () => {
+              this.loading.set(false);
+              this.step3Error.set('Clé copiée mais impossible de vérifier la connexion par clé.');
             }
-          },
-          error: () => {
-            this.loading.set(false);
-            this.step3Error.set('Clé copiée mais impossible de vérifier la connexion par clé.');
-          }
-        });
+          });
+        } else {
+          // "Autre machine" mode: no local private key to verify, just mark as copied
+          this.loading.set(false);
+          this.api.updateHost(h.id, { status: 'key-copied' }).subscribe({ next: updated => this.host.set(updated) });
+          this.msg.add({ severity: 'success', summary: 'Clé ajoutée !', detail: 'L\'autre machine peut maintenant accéder au serveur.' });
+          setTimeout(() => this.nextStep(), 800);
+        }
       },
       error: err => {
         this.loading.set(false);
@@ -557,6 +638,31 @@ export class SetupComponent implements OnInit, OnDestroy, AfterViewChecked {
         this.nextStep();
       },
       error: () => { this.loading.set(false); }
+    });
+  }
+
+  step4SaveSshConfig() {
+    const h = this.host();
+    if (!h || !this.f4.sshAlias) return;
+    this.sshConfigLoading.set(true);
+    this.sshConfigMsg.set('');
+    this.api.addSshConfig({
+      alias: this.f4.sshAlias,
+      hostname: h.ip,
+      user: this.f4.deployUser || 'deploy',
+      port: Number(this.f4.sshPort) || 1024,
+      identityFile: this.f4.privateKeyPath || '~/.ssh/id_ed25519'
+    }).subscribe({
+      next: () => {
+        this.sshConfigLoading.set(false);
+        this.sshConfigError.set(false);
+        this.sshConfigMsg.set(`✓ Entrée ajoutée — tu peux maintenant faire : ssh ${this.f4.sshAlias}`);
+      },
+      error: err => {
+        this.sshConfigLoading.set(false);
+        this.sshConfigError.set(true);
+        this.sshConfigMsg.set(err.error?.error || 'Erreur lors de l\'écriture');
+      }
     });
   }
 
