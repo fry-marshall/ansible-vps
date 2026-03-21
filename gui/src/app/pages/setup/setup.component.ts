@@ -124,7 +124,14 @@ const STATUS_ORDER = ['new', 'ssh-ok', 'password-changed', 'key-copied', 'config
             <p-password [(ngModel)]="f1.password" [feedback]="false" [toggleMask]="true" styleClass="w-full" inputStyleClass="w-full"></p-password>
           </div>
 
-          @if (f1.output) {
+          @if (f1.passwordExpired) {
+            <div class="alert" style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.25);color:#fbbf24;margin-bottom:12px">
+              <i class="pi pi-exclamation-triangle" style="margin-right:8px"></i>
+              <strong>Mot de passe expiré</strong> — Connexion réussie, mais le serveur exige un changement de mot de passe.
+              L'étape suivante le gère automatiquement.
+            </div>
+          }
+          @if (f1.output && !f1.passwordExpired) {
             <div class="alert alert-success">
               <i class="pi pi-check-circle" style="margin-right:8px"></i> Connexion réussie
               <div class="ssh-output">{{ f1.output }}</div>
@@ -345,7 +352,7 @@ export class SetupComponent implements OnInit, OnDestroy, AfterViewChecked {
   step3Error = signal('');
 
   f0 = { ip: '', label: '', rootPort: 22 };
-  f1 = { password: '', output: '' };
+  f1 = { password: '', output: '', passwordExpired: false };
   f2 = { currentPassword: '', newPassword: '', confirmPassword: '' };
   f3: { selectedKey: SshKey | null; password: string } = { selectedKey: null, password: '' };
   f4 = { deployUser: 'deploy', sshPort: 1024, privateKeyPath: '~/.ssh/id_ed25519', vaultPassword: '' };
@@ -448,8 +455,11 @@ export class SetupComponent implements OnInit, OnDestroy, AfterViewChecked {
       next: res => {
         this.loading.set(false);
         this.f1.output = res.output || 'OK';
+        this.f1.passwordExpired = !!res.passwordExpired;
+        // Pre-fill the current password in step 2 so the user doesn't have to retype it
+        if (!this.f2.currentPassword) this.f2.currentPassword = this.f1.password;
         this.api.updateHost(h.id, { status: 'ssh-ok' }).subscribe({ next: updated => this.host.set(updated) });
-        setTimeout(() => this.nextStep(), 1200);
+        setTimeout(() => this.nextStep(), this.f1.passwordExpired ? 2000 : 1200);
       },
       error: err => {
         this.loading.set(false);
