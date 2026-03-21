@@ -2,9 +2,9 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-const path = require('path');
 
-const inventoryRoutes = require('./routes/inventory');
+const hostsRoutes = require('./routes/hosts');
+const sshRoutes = require('./routes/ssh');
 const configRoutes = require('./routes/config');
 const deployRoutes = require('./routes/deploy');
 const statusRoutes = require('./routes/status');
@@ -19,22 +19,19 @@ const io = new Server(server, {
 app.use(cors());
 app.use(express.json());
 
-app.use('/api/inventory', inventoryRoutes);
+app.use('/api/hosts', hostsRoutes);
+app.use('/api/ssh', sshRoutes);
 app.use('/api/config', configRoutes);
 app.use('/api/deploy', deployRoutes);
 app.use('/api/status', statusRoutes);
-
 app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 io.on('connection', (socket) => {
-  console.log('Client connected:', socket.id);
   setupDeploySocket(socket, io);
-  socket.on('disconnect', () => console.log('Client disconnected:', socket.id));
+  socket.on('disconnect', () => {});
 });
 
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
-  console.log(`Backend running on http://localhost:${PORT}`);
-});
+server.listen(PORT, () => console.log(`Backend running on http://localhost:${PORT}`));
 
 module.exports = { io };

@@ -7,16 +7,8 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/dashboard/dashboard.component').then(m => m.DashboardComponent)
   },
   {
-    path: 'inventory',
-    loadComponent: () => import('./pages/inventory/inventory.component').then(m => m.InventoryComponent)
-  },
-  {
-    path: 'config',
-    loadComponent: () => import('./pages/config/config.component').then(m => m.ConfigComponent)
-  },
-  {
-    path: 'deploy',
-    loadComponent: () => import('./pages/deploy/deploy.component').then(m => m.DeployComponent)
+    path: 'setup',
+    loadComponent: () => import('./pages/setup/setup.component').then(m => m.SetupComponent)
   },
   {
     path: 'logs',

@@ -1,233 +1,187 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
 import { ToastModule } from 'primeng/toast';
 import { MessageService } from 'primeng/api';
-import { ApiService } from '../../services/api.service';
-import { DeployService } from '../../services/deploy.service';
+import { ApiService, Host } from '../../services/api.service';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterLink, ButtonModule, TagModule, ToastModule],
+  imports: [CommonModule, ButtonModule, TagModule, ToastModule],
   providers: [MessageService],
   styles: [`
-    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
-    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-    .card { background: #13161e; border: 1px solid #2a3145; border-radius: 12px; padding: 1.25rem 1.5rem; }
-    .card:hover { border-color: #374151; }
-    .stat-label { font-size: 0.75rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
-    .stat-value { font-size: 1.75rem; font-weight: 700; color: #e2e8f0; }
-    .stat-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-    .stat-icon-box { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
-    .host-card { background: #0d0f14; border: 1px solid #1a1e2a; border-radius: 8px; padding: 1rem; margin-bottom: 12px; }
-    .host-meta { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
-    .host-meta-item { padding: 8px; }
-    .meta-label { font-size: 0.72rem; color: #475569; margin-bottom: 2px; }
-    .meta-val { font-size: 0.85rem; color: #94a3b8; font-family: monospace; }
-    .action-item { background: #0d0f14; border: 1px solid #1a1e2a; border-radius: 8px; padding: 1rem; cursor: pointer; transition: border-color 0.15s; margin-bottom: 10px; display: flex; align-items: center; gap: 12px; text-decoration: none; }
-    .action-item:hover { border-color: rgba(99,102,241,0.4); }
-    .action-icon { width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    .feat-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid #1a1e2a; }
-    .feat-icon { font-size: 0.9rem; width: 20px; text-align: center; flex-shrink: 0; }
-    .info-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; }
-    .ping-output { font-family: monospace; font-size: 12px; background: #060810; color: #cdd6f4; padding: 12px 16px; border-radius: 8px; overflow-y: auto; max-height: 160px; border: 1px solid #1a1e2a; white-space: pre-wrap; word-break: break-all; margin-top: 16px; }
+    .empty-state { display:flex; flex-direction:column; align-items:center; justify-content:center; height:calc(100vh - 200px); text-align:center; gap:24px; }
+    .empty-icon { width:80px; height:80px; border-radius:20px; background:rgba(99,102,241,0.08); border:2px dashed rgba(99,102,241,0.2); display:flex; align-items:center; justify-content:center; }
+    .host-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:16px; }
+    .host-card { background:#13161e; border:1px solid #2a3145; border-radius:14px; padding:1.5rem; transition:border-color 0.15s; }
+    .host-card:hover { border-color:#374151; }
+    .host-card-head { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:16px; }
+    .host-avatar { width:48px; height:48px; border-radius:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .host-meta { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:16px; }
+    .meta-item { background:#0d0f14; border-radius:8px; padding:10px 12px; }
+    .meta-label { font-size:0.7rem; color:#475569; margin-bottom:3px; text-transform:uppercase; letter-spacing:0.04em; }
+    .meta-val { font-size:0.875rem; color:#e2e8f0; font-family:monospace; }
+    .progress-steps { display:flex; gap:4px; margin-top:12px; }
+    .step { height:3px; border-radius:2px; flex:1; }
+    .step.done { background:#6366f1; }
+    .step.active { background:rgba(99,102,241,0.4); }
+    .step.todo { background:#1a1e2a; }
+    .page-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; }
+    .card-actions { display:flex; gap:8px; }
   `],
   template: `
     <p-toast />
 
-    <div style="margin-bottom:24px">
-      <h1 style="font-size:1.5rem;font-weight:700;color:#e2e8f0;margin:0 0 4px">Dashboard</h1>
-      <p style="color:#64748b;font-size:0.875rem;margin:0">Vue d'ensemble de ton infrastructure VPS</p>
-    </div>
-
-    <!-- Stat cards -->
-    <div class="stats-grid">
-      @for (card of statCards(); track card.label) {
-        <div class="card">
-          <div class="stat-head">
-            <div class="stat-label">{{ card.label }}</div>
-            <div class="stat-icon-box" [style.background]="card.bg">
-              <i [class]="'pi ' + card.icon" [style.color]="card.color" style="font-size:1.1rem"></i>
-            </div>
-          </div>
-          <div class="stat-value">{{ card.value }}</div>
-        </div>
+    <div class="page-header">
+      <div>
+        <h1 style="font-size:1.5rem;font-weight:700;color:#e2e8f0;margin:0 0 4px">Mes serveurs VPS</h1>
+        <p style="color:#64748b;font-size:0.875rem;margin:0">{{ hosts().length }} serveur(s) enregistré(s)</p>
+      </div>
+      @if (hosts().length > 0) {
+        <p-button label="Ajouter un VPS" icon="pi pi-plus" (onClick)="goToSetup()"></p-button>
       }
     </div>
 
-    <!-- 2 colonnes -->
-    <div class="two-col" style="margin-bottom:16px">
-
-      <!-- Statut VPS -->
-      <div class="card">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-          <h2 style="font-size:1rem;font-weight:600;color:#e2e8f0;margin:0">Statut VPS</h2>
-          <p-button label="Ping" icon="pi pi-wifi" size="small" [outlined]="true"
-            (onClick)="pingVps()" [loading]="pinging()">
-          </p-button>
+    @if (hosts().length === 0) {
+      <div class="empty-state">
+        <div class="empty-icon">
+          <i class="pi pi-server" style="font-size:2rem;color:#6366f1"></i>
         </div>
-        @for (host of hosts(); track host.ip) {
+        <div>
+          <div style="font-size:1.25rem;font-weight:700;color:#e2e8f0;margin-bottom:8px">Aucun serveur configuré</div>
+          <div style="font-size:0.9rem;color:#64748b;max-width:400px;line-height:1.6">
+            Ajoute ton premier VPS et l'interface te guidera pas à pas — connexion SSH, configuration et déploiement Ansible.
+          </div>
+        </div>
+        <p-button label="Configurer mon premier VPS" icon="pi pi-plus" size="large" (onClick)="goToSetup()"></p-button>
+      </div>
+    } @else {
+      <div class="host-grid">
+        @for (host of hosts(); track host.id) {
           <div class="host-card">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-              <div style="display:flex;align-items:center;gap:8px">
-                <div [style.background]="hostStatusColor(host.status)"
-                     style="width:8px;height:8px;border-radius:50%;"
-                     [style.boxShadow]="'0 0 6px ' + hostStatusColor(host.status)">
+            <div class="host-card-head">
+              <div style="display:flex;align-items:center;gap:12px">
+                <div class="host-avatar" [style.background]="statusBg(host.status)">
+                  <i class="pi pi-server" [style.color]="statusColor(host.status)" style="font-size:1.3rem"></i>
                 </div>
-                <span style="font-weight:600;color:#e2e8f0;font-size:0.9rem;font-family:monospace">{{ host.ip }}</span>
+                <div>
+                  <div style="font-size:1rem;font-weight:700;color:#e2e8f0">{{ host.label }}</div>
+                  <div style="font-size:0.8rem;color:#64748b;font-family:monospace">{{ host.ip }}</div>
+                </div>
               </div>
-              <p-tag [value]="host.status" [severity]="hostSeverity(host.status)" size="small"></p-tag>
+              <p-tag [value]="statusLabel(host.status)" [severity]="statusSeverity(host.status)" size="small"></p-tag>
             </div>
+
+            <!-- Progress steps -->
+            <div style="font-size:0.72rem;color:#475569;margin-bottom:6px">Progression du setup</div>
+            <div class="progress-steps">
+              @for (step of steps; track step.key) {
+                <div class="step" [class]="stepClass(host.status, step.key)" [title]="step.label"></div>
+              }
+            </div>
+            <div style="font-size:0.72rem;color:#64748b;margin-top:4px">{{ stepDesc(host.status) }}</div>
+
             <div class="host-meta">
-              <div class="host-meta-item">
-                <div class="meta-label">Groupe</div>
-                <div class="meta-val">{{ host.group }}</div>
+              <div class="meta-item">
+                <div class="meta-label">Port initial</div>
+                <div class="meta-val">{{ host.rootPort }}</div>
               </div>
-              <div class="host-meta-item">
-                <div class="meta-label">Utilisateur</div>
-                <div class="meta-val">{{ host.user }}</div>
+              <div class="meta-item">
+                <div class="meta-label">Port SSH final</div>
+                <div class="meta-val">{{ host.sshPort || '—' }}</div>
               </div>
-              <div class="host-meta-item">
-                <div class="meta-label">Port SSH</div>
-                <div class="meta-val">{{ host.port }}</div>
-              </div>
+            </div>
+
+            <div class="card-actions" style="margin-top:16px">
+              @if (host.status !== 'configured') {
+                <p-button label="Continuer le setup" icon="pi pi-arrow-right" size="small"
+                  styleClass="w-full" (onClick)="continueSetup(host)">
+                </p-button>
+              } @else {
+                <p-button label="Redéployer" icon="pi pi-play-circle" size="small" [outlined]="true"
+                  (onClick)="continueSetup(host)">
+                </p-button>
+                <p-button icon="pi pi-trash" severity="danger" [outlined]="true" size="small"
+                  (onClick)="deleteHost(host)">
+                </p-button>
+              }
             </div>
           </div>
         }
-        @if (pingOutput().length > 0) {
-          <div class="ping-output">{{ pingOutput().join('') }}</div>
-        }
       </div>
-
-      <!-- Actions rapides -->
-      <div class="card">
-        <h2 style="font-size:1rem;font-weight:600;color:#e2e8f0;margin:0 0 12px">Actions rapides</h2>
-        @for (action of quickActions; track action.label) {
-          <a class="action-item" [routerLink]="action.route">
-            <div class="action-icon" [style.background]="action.bg">
-              <i [class]="'pi ' + action.icon" [style.color]="action.color" style="font-size:1.1rem"></i>
-            </div>
-            <div style="flex:1">
-              <div style="font-weight:600;color:#e2e8f0;font-size:0.875rem">{{ action.label }}</div>
-              <div style="color:#64748b;font-size:0.78rem">{{ action.desc }}</div>
-            </div>
-            <i class="pi pi-chevron-right" style="color:#374151;font-size:0.75rem"></i>
-          </a>
-        }
-      </div>
-
-      <!-- Infrastructure -->
-      <div class="card">
-        <h2 style="font-size:1rem;font-weight:600;color:#e2e8f0;margin:0 0 12px">Sécurité configurée</h2>
-        @for (feature of features; track feature.label) {
-          <div class="feat-row">
-            <i [class]="'pi feat-icon ' + feature.icon" [style.color]="feature.color"></i>
-            <div style="flex:1">
-              <div style="font-size:0.85rem;color:#e2e8f0;font-weight:500">{{ feature.label }}</div>
-              <div style="font-size:0.75rem;color:#64748b">{{ feature.desc }}</div>
-            </div>
-            <p-tag [value]="feature.status" [severity]="feature.enabled ? 'success' : 'secondary'" size="small"></p-tag>
-          </div>
-        }
-      </div>
-
-      <!-- Projet -->
-      <div class="card">
-        <h2 style="font-size:1rem;font-weight:600;color:#e2e8f0;margin:0 0 12px">Projet</h2>
-        @for (info of projectInfo(); track info.key) {
-          <div class="info-row">
-            <span style="font-size:0.82rem;color:#64748b">{{ info.key }}</span>
-            <span style="font-size:0.82rem;color:#e2e8f0;font-weight:500;font-family:monospace">{{ info.value }}</span>
-          </div>
-        }
-        <div style="margin-top:16px;padding-top:16px;border-top:1px solid #1a1e2a">
-          <p-button label="Lancer un déploiement" icon="pi pi-play-circle"
-            routerLink="/deploy" styleClass="w-full" size="small">
-          </p-button>
-        </div>
-      </div>
-
-    </div>
+    }
   `
 })
 export class DashboardComponent implements OnInit {
-  pinging = signal(false);
-  pingOutput = signal<string[]>([]);
-  hosts = signal<any[]>([]);
+  hosts = signal<Host[]>([]);
 
-  statCards = signal([
-    { label: 'Hôtes VPS',    value: '1', icon: 'pi-server',     color: '#818cf8', bg: 'rgba(99,102,241,0.12)' },
-    { label: 'Rôles actifs', value: '1', icon: 'pi-cog',        color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
-    { label: 'Tâches',       value: '8', icon: 'pi-list-check',  color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
-    { label: 'Ports ouverts', value: '3', icon: 'pi-shield',    color: '#22d3ee', bg: 'rgba(34,211,238,0.12)' },
-  ]);
-
-  projectInfo = signal<{ key: string; value: string }[]>([]);
-
-  quickActions = [
-    { label: "Gérer l'inventaire", desc: 'Ajouter ou modifier des hôtes VPS', icon: 'pi-sitemap',     route: '/inventory', color: '#818cf8', bg: 'rgba(99,102,241,0.12)' },
-    { label: 'Configurer',          desc: 'Modifier vars.yml et le vault chiffré', icon: 'pi-sliders-h', route: '/config',    color: '#22d3ee', bg: 'rgba(34,211,238,0.12)' },
-    { label: 'Déployer',            desc: 'Lancer le playbook avec logs live', icon: 'pi-play-circle',  route: '/deploy',    color: '#22c55e', bg: 'rgba(34,197,94,0.12)' },
-    { label: 'Historique',          desc: 'Voir les déploiements précédents', icon: 'pi-history',       route: '/logs',      color: '#f59e0b', bg: 'rgba(245,158,11,0.12)' },
+  steps = [
+    { key: 'ssh-ok',           label: 'Connexion SSH' },
+    { key: 'password-changed', label: 'Mot de passe changé' },
+    { key: 'key-copied',       label: 'Clé SSH copiée' },
+    { key: 'configured',       label: 'Ansible déployé' },
   ];
 
-  features = [
-    { label: 'Durcissement SSH',  desc: 'Port 1024, auth clé, no-root',       icon: 'pi-lock',    color: '#22c55e', status: 'Actif',     enabled: true },
-    { label: 'Pare-feu UFW',      desc: 'Deny all + ports 1024/80/443',        icon: 'pi-shield',  color: '#22c55e', status: 'Actif',     enabled: true },
-    { label: 'Fail2ban',          desc: 'Anti-brute-force + alertes email',    icon: 'pi-eye',     color: '#22c55e', status: 'Actif',     enabled: true },
-    { label: 'Notifs SSH login',  desc: 'Email à chaque connexion SSH',        icon: 'pi-bell',    color: '#f59e0b', status: 'Désactivé', enabled: false },
-    { label: 'Docker CE',         desc: 'Docker + docker-compose installés',   icon: 'pi-box',     color: '#22c55e', status: 'Actif',     enabled: true },
-    { label: 'Updates auto',      desc: 'Patches sécurité nocturnes',          icon: 'pi-refresh', color: '#22c55e', status: 'Actif',     enabled: true },
-  ];
+  private statusOrder = ['new', 'ssh-ok', 'password-changed', 'key-copied', 'configured'];
 
-  constructor(private api: ApiService, private deploy: DeployService) {}
+  constructor(private api: ApiService, private router: Router, private msg: MessageService) {}
 
-  ngOnInit() {
-    this.deploy.reset(); // ne pas auto-lancer le ping
-    this.api.getInventory().subscribe({ next: ({ hosts }) => {
-      this.hosts.set(hosts.map(h => ({
-        ip: h.host, group: h.group,
-        user: h.vars['ansible_user'] || 'deploy',
-        port: h.vars['ansible_port'] || '22',
-        status: 'unknown'
-      })));
-      this.statCards.update(c => c.map(s =>
-        s.label === 'Hôtes VPS' ? { ...s, value: String(hosts.length) } : s
-      ));
-    }});
+  ngOnInit() { this.api.getHosts().subscribe({ next: h => this.hosts.set(h) }); }
 
-    this.api.getProjectStatus().subscribe({ next: s => {
-      this.projectInfo.set([
-        { key: 'Chemin projet',  value: '~/DEV/ansible-vps-config' },
-        { key: 'Inventaire',     value: s.hasInventory ? '✓ inventory.ini' : '✗ manquant' },
-        { key: 'Playbook',       value: s.hasPlaybook  ? '✓ playbook.yml'  : '✗ manquant' },
-        { key: 'Vault',          value: s.hasVault     ? '✓ chiffré'       : '✗ non configuré' },
-      ]);
-    }});
+  goToSetup() { this.router.navigate(['/setup']); }
+
+  continueSetup(host: Host) {
+    this.router.navigate(['/setup'], { queryParams: { hostId: host.id } });
   }
 
-  pingVps() {
-    this.pinging.set(true);
-    this.pingOutput.set([]);
-    this.deploy.runPing();
-    const interval = setInterval(() => {
-      this.pingOutput.set(this.deploy.output().map(l => l.text));
-      const s = this.deploy.status();
-      if (s === 'success' || s === 'failed' || s === 'error') {
-        clearInterval(interval);
-        this.pinging.set(false);
-        this.hosts.update(hosts => hosts.map(h => ({ ...h, status: s === 'success' ? 'online' : 'offline' })));
+  deleteHost(host: Host) {
+    this.api.deleteHost(host.id).subscribe({
+      next: () => {
+        this.msg.add({ severity: 'success', summary: 'Supprimé', detail: host.label });
+        this.hosts.update(h => h.filter(x => x.id !== host.id));
       }
-    }, 400);
+    });
   }
 
-  hostStatusColor(status: string) {
-    return status === 'online' ? '#22c55e' : status === 'offline' ? '#ef4444' : '#64748b';
+  stepClass(hostStatus: string, stepKey: string): string {
+    const hostIdx = this.statusOrder.indexOf(hostStatus);
+    const stepIdx = this.statusOrder.indexOf(stepKey);
+    if (hostIdx >= stepIdx) return 'done';
+    if (hostIdx === stepIdx - 1) return 'active';
+    return 'todo';
   }
-  hostSeverity(status: string): any {
-    return status === 'online' ? 'success' : status === 'offline' ? 'danger' : 'secondary';
+
+  stepDesc(status: string) {
+    const map: Record<string, string> = {
+      'new': 'Prêt à démarrer',
+      'ssh-ok': 'SSH OK — changer le mot de passe',
+      'password-changed': 'Mot de passe changé — copier la clé SSH',
+      'key-copied': 'Clé SSH copiée — lancer Ansible',
+      'configured': 'Fully configured',
+    };
+    return map[status] || status;
+  }
+
+  statusColor(s: string) {
+    if (s === 'configured') return '#22c55e';
+    if (s === 'new') return '#64748b';
+    return '#f59e0b';
+  }
+  statusBg(s: string) {
+    if (s === 'configured') return 'rgba(34,197,94,0.1)';
+    if (s === 'new') return 'rgba(148,163,184,0.08)';
+    return 'rgba(245,158,11,0.1)';
+  }
+  statusLabel(s: string) {
+    const map: Record<string, string> = { new:'Nouveau', 'ssh-ok':'SSH OK', 'password-changed':'Mdp changé', 'key-copied':'Clé copiée', configured:'Configuré' };
+    return map[s] || s;
+  }
+  statusSeverity(s: string): any {
+    if (s === 'configured') return 'success';
+    if (s === 'new') return 'secondary';
+    return 'warn';
   }
 }
