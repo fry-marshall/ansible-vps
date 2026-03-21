@@ -56,6 +56,11 @@ export class ApiService {
   decryptVault(password: string): Observable<any> { return this.http.post<any>(`${API_URL}/config/vault/decrypt`, { password }); }
   saveVault(data: any, password: string): Observable<any> { return this.http.post(`${API_URL}/config/vault/save`, { data, password }); }
 
+  getSshConfig(): Observable<{ content: string }> { return this.http.get<{ content: string }>(`${API_URL}/ssh/ssh-config`); }
+  addSshConfig(data: { alias: string; hostname: string; user: string; port: number; identityFile: string }): Observable<any> { return this.http.post<any>(`${API_URL}/ssh/ssh-config`, data); }
+  deleteSshConfig(alias: string): Observable<any> { return this.http.delete(`${API_URL}/ssh/ssh-config/${alias}`); }
+  addAuthorizedKey(data: { host: string; port: number; username: string; privateKeyPath: string; newPublicKey: string }): Observable<any> { return this.http.post<any>(`${API_URL}/ssh/add-authorized-key`, data); }
+
   getLogs(): Observable<LogEntry[]> { return this.http.get<LogEntry[]>(`${API_URL}/deploy/logs`); }
   getLog(jobId: string): Observable<LogEntry> { return this.http.get<LogEntry>(`${API_URL}/deploy/logs/${jobId}`); }
   deleteLog(jobId: string): Observable<any> { return this.http.delete(`${API_URL}/deploy/logs/${jobId}`); }
