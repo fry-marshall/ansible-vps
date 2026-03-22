@@ -10,11 +10,12 @@ import { InputTextModule } from 'primeng/inputtext';
 import { TabsModule } from 'primeng/tabs';
 import { MessageService } from 'primeng/api';
 import { ApiService, Host, SshKey } from '../../services/api.service';
+import { PasswordModule } from 'primeng/password';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, ButtonModule, TagModule, ToastModule, DialogModule, InputTextModule, TabsModule],
+  imports: [CommonModule, FormsModule, ButtonModule, TagModule, ToastModule, DialogModule, InputTextModule, TabsModule, PasswordModule],
   providers: [MessageService],
   styles: [`
     .empty-state { display:flex; flex-direction:column; align-items:center; justify-content:center; height:calc(100vh - 200px); text-align:center; gap:24px; }
@@ -49,6 +50,28 @@ import { ApiService, Host, SshKey } from '../../services/api.service';
     .field-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
     .dlg-field { margin-bottom:14px; }
     .dlg-field input { width:100%; box-sizing:border-box; }
+
+    /* Choose dialog */
+    .choose-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:8px; }
+    .choose-card { border:2px solid #1a1e2a; border-radius:14px; padding:28px 20px; text-align:center; cursor:pointer; transition:all 0.15s; background:#0d0f14; }
+    .choose-card:hover { border-color:#6366f1; background:rgba(99,102,241,0.05); }
+    .choose-card .icon { width:56px; height:56px; border-radius:14px; display:flex; align-items:center; justify-content:center; margin:0 auto 16px; }
+    .choose-card h3 { font-size:0.95rem; font-weight:700; color:#e2e8f0; margin:0 0 8px; }
+    .choose-card p { font-size:0.78rem; color:#64748b; line-height:1.5; margin:0; }
+
+    /* Quick-connect stepper */
+    .qc-step-bar { display:flex; gap:6px; margin-bottom:24px; }
+    .qc-step-bar .qcs { flex:1; height:3px; border-radius:2px; background:#1a1e2a; transition:background 0.2s; }
+    .qc-step-bar .qcs.done { background:#6366f1; }
+    .qc-step-bar .qcs.active { background:rgba(99,102,241,0.5); }
+    .key-select-list { display:flex; flex-direction:column; gap:8px; margin-top:8px; }
+    .key-select-item { display:flex; align-items:center; gap:12px; padding:10px 14px; border:1px solid #1a1e2a; border-radius:8px; cursor:pointer; transition:all 0.15s; }
+    .key-select-item:hover { border-color:#6366f1; background:rgba(99,102,241,0.06); }
+    .key-select-item.selected { border-color:#6366f1; background:rgba(99,102,241,0.1); }
+    .key-select-item .key-name { font-size:0.85rem; font-weight:600; color:#e2e8f0; font-family:monospace; }
+    .key-select-item .key-fp { font-size:0.7rem; color:#475569; margin-top:2px; word-break:break-all; }
+    .success-box { text-align:center; padding:32px 0; }
+    .success-box .check { width:64px; height:64px; border-radius:50%; background:rgba(34,197,94,0.1); border:2px solid rgba(34,197,94,0.3); display:flex; align-items:center; justify-content:center; margin:0 auto 20px; }
   `],
   template: `
     <p-toast />
@@ -59,7 +82,7 @@ import { ApiService, Host, SshKey } from '../../services/api.service';
         <p style="color:#64748b;font-size:0.875rem;margin:0">{{ hosts().length }} serveur(s) enregistré(s)</p>
       </div>
       @if (hosts().length > 0) {
-        <p-button label="Ajouter un VPS" icon="pi pi-plus" (onClick)="goToSetup()"></p-button>
+        <p-button label="Ajouter / Connecter un VPS" icon="pi pi-plus" (onClick)="openChoose()"></p-button>
       }
     </div>
 
@@ -74,7 +97,7 @@ import { ApiService, Host, SshKey } from '../../services/api.service';
             Ajoute ton premier VPS et l'interface te guidera pas à pas — connexion SSH, configuration et déploiement Ansible.
           </div>
         </div>
-        <p-button label="Configurer mon premier VPS" icon="pi pi-plus" size="large" (onClick)="goToSetup()"></p-button>
+        <p-button label="Configurer mon premier VPS" icon="pi pi-plus" size="large" (onClick)="openChoose()"></p-button>
       </div>
     } @else {
       <div class="host-grid">
@@ -145,6 +168,185 @@ import { ApiService, Host, SshKey } from '../../services/api.service';
         }
       </div>
     }
+
+    <!-- ─── Dialog Choisir le type d'ajout ───────────────────────────────── -->
+    <p-dialog
+      [(visible)]="showChooseDialog"
+      [modal]="true"
+      [style]="{ width: '560px' }"
+      header="Que veux-tu faire ?"
+      [draggable]="false"
+      [resizable]="false">
+      <p style="font-size:0.85rem;color:#64748b;margin:0 0 20px">
+        Choisis selon la situation de ton VPS.
+      </p>
+      <div class="choose-grid">
+        <div class="choose-card" (click)="chooseNew()">
+          <div class="icon" style="background:rgba(99,102,241,0.12)">
+            <i class="pi pi-server" style="font-size:1.5rem;color:#818cf8"></i>
+          </div>
+          <h3>Nouveau VPS</h3>
+          <p>Mon serveur vient d'être créé. Je veux le configurer de A à Z (SSH, mot de passe, clé, Ansible).</p>
+        </div>
+        <div class="choose-card" (click)="chooseConnect()">
+          <div class="icon" style="background:rgba(34,197,94,0.1)">
+            <i class="pi pi-link" style="font-size:1.5rem;color:#4ade80"></i>
+          </div>
+          <h3>VPS déjà configuré</h3>
+          <p>Mon VPS tourne déjà. Je veux juste y connecter cette machine (copier ma clé SSH + alias).</p>
+        </div>
+      </div>
+    </p-dialog>
+
+    <!-- ─── Dialog Connexion rapide VPS existant ───────────────────────────── -->
+    <p-dialog
+      [(visible)]="showQuickConnect"
+      [modal]="true"
+      [style]="{ width: '540px' }"
+      header="Connecter un VPS existant"
+      [draggable]="false"
+      [resizable]="false">
+
+      <!-- Step bar -->
+      <div class="qc-step-bar">
+        <div class="qcs" [class.done]="qcStep > 0" [class.active]="qcStep === 0"></div>
+        <div class="qcs" [class.done]="qcStep > 1" [class.active]="qcStep === 1"></div>
+        <div class="qcs" [class.done]="qcStep > 2" [class.active]="qcStep === 2"></div>
+        <div class="qcs" [class.done]="qcStep > 3" [class.active]="qcStep === 3"></div>
+      </div>
+
+      @if (qcStep === 0) {
+        <!-- Step 1 : Infos de connexion -->
+        <div>
+          <div style="font-size:0.9rem;font-weight:600;color:#e2e8f0;margin-bottom:4px">1 — Infos du serveur</div>
+          <p style="font-size:0.8rem;color:#64748b;margin:0 0 20px">Entre les informations pour te connecter au VPS.</p>
+
+          <div class="field-row">
+            <div class="dlg-field">
+              <span class="dlg-label">Adresse IP</span>
+              <input pInputText [(ngModel)]="qc.host" placeholder="1.2.3.4" style="font-family:monospace" />
+            </div>
+            <div class="dlg-field">
+              <span class="dlg-label">Port SSH</span>
+              <input pInputText [(ngModel)]="qc.port" type="number" placeholder="22" />
+            </div>
+          </div>
+
+          <div class="field-row">
+            <div class="dlg-field">
+              <span class="dlg-label">Utilisateur</span>
+              <input pInputText [(ngModel)]="qc.user" placeholder="deploy" />
+            </div>
+          </div>
+
+          <div class="dlg-field">
+            <span class="dlg-label">Mot de passe</span>
+            <p-password [(ngModel)]="qc.password" [feedback]="false" [toggleMask]="true" styleClass="w-full" inputStyleClass="w-full" placeholder="Mot de passe SSH" />
+          </div>
+
+          @if (qcMsg()) {
+            <div class="alert" [class.alert-error]="qcError()" [class.alert-success]="!qcError()">
+              <i class="pi" [class.pi-times-circle]="qcError()" [class.pi-check-circle]="!qcError()" style="margin-right:8px"></i>{{ qcMsg() }}
+            </div>
+          }
+
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:20px">
+            <p-button label="Annuler" severity="secondary" [outlined]="true" (onClick)="showQuickConnect=false"></p-button>
+            <p-button label="Tester la connexion" icon="pi pi-bolt" [loading]="qcLoading()" (onClick)="qcTest()"></p-button>
+          </div>
+        </div>
+      }
+
+      @if (qcStep === 1) {
+        <!-- Step 2 : Choisir la clé locale -->
+        <div>
+          <div style="font-size:0.9rem;font-weight:600;color:#e2e8f0;margin-bottom:4px">2 — Sélectionne ta clé SSH</div>
+          <p style="font-size:0.8rem;color:#64748b;margin:0 0 16px">Quelle clé publique veux-tu déposer sur le serveur ?</p>
+
+          @if (sshKeys().length === 0) {
+            <div class="alert alert-error">Aucune clé .pub trouvée dans ~/.ssh/</div>
+          } @else {
+            <div class="key-select-list">
+              @for (k of sshKeys(); track k.name) {
+                <div class="key-select-item" [class.selected]="qc.selectedKey?.name === k.name" (click)="qc.selectedKey = k">
+                  <i class="pi pi-key" style="color:#818cf8;font-size:1rem;flex-shrink:0"></i>
+                  <div>
+                    <div class="key-name">{{ k.name }}</div>
+                    <div class="key-fp">{{ k.content | slice:0:72 }}…</div>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+
+          @if (qcMsg()) {
+            <div class="alert" [class.alert-error]="qcError()" [class.alert-success]="!qcError()" style="margin-top:12px">
+              <i class="pi" [class.pi-times-circle]="qcError()" [class.pi-check-circle]="!qcError()" style="margin-right:8px"></i>{{ qcMsg() }}
+            </div>
+          }
+
+          <div style="display:flex;justify-content:space-between;gap:8px;margin-top:20px">
+            <p-button label="Retour" severity="secondary" [outlined]="true" (onClick)="qcStep=0"></p-button>
+            <p-button label="Copier la clé sur le serveur" icon="pi pi-upload" [loading]="qcLoading()" [disabled]="!qc.selectedKey" (onClick)="qcCopyKey()"></p-button>
+          </div>
+        </div>
+      }
+
+      @if (qcStep === 2) {
+        <!-- Step 3 : SSH Config alias -->
+        <div>
+          <div style="font-size:0.9rem;font-weight:600;color:#e2e8f0;margin-bottom:4px">3 — Alias SSH (optionnel)</div>
+          <p style="font-size:0.8rem;color:#64748b;margin:0 0 16px">
+            Génère une entrée dans <code style="color:#818cf8">~/.ssh/config</code> pour taper <code style="color:#4ade80">ssh {{ qcAlias() }}</code> au lieu de l'IP.
+          </p>
+
+          <div class="field-row">
+            <div class="dlg-field">
+              <span class="dlg-label">Alias</span>
+              <input pInputText [(ngModel)]="qc.alias" placeholder="mon_vps" style="font-family:monospace" />
+            </div>
+            <div class="dlg-field">
+              <span class="dlg-label">Clé privée utilisée</span>
+              <input pInputText [(ngModel)]="qc.privateKeyPath" placeholder="~/.ssh/id_ed25519" style="font-family:monospace" />
+            </div>
+          </div>
+
+          <pre style="background:#0a0c10;border-radius:8px;padding:12px;font-size:0.72rem;color:#94a3b8;margin:0 0 8px;overflow-x:auto">{{ qcConfigPreview() }}</pre>
+
+          @if (qcMsg()) {
+            <div class="alert" [class.alert-error]="qcError()" [class.alert-success]="!qcError()">
+              <i class="pi" [class.pi-times-circle]="qcError()" [class.pi-check-circle]="!qcError()" style="margin-right:8px"></i>{{ qcMsg() }}
+            </div>
+          }
+
+          <div style="display:flex;justify-content:space-between;gap:8px;margin-top:20px">
+            <p-button label="Ignorer" severity="secondary" [outlined]="true" (onClick)="qcStep=3"></p-button>
+            <p-button label="Appliquer dans ~/.ssh/config" icon="pi pi-save" [loading]="qcLoading()" [disabled]="!qc.alias" (onClick)="qcSaveAlias()"></p-button>
+          </div>
+        </div>
+      }
+
+      @if (qcStep === 3) {
+        <!-- Succès -->
+        <div class="success-box">
+          <div class="check">
+            <i class="pi pi-check" style="font-size:1.8rem;color:#4ade80"></i>
+          </div>
+          <div style="font-size:1.1rem;font-weight:700;color:#e2e8f0;margin-bottom:8px">Connexion configurée !</div>
+          <div style="font-size:0.85rem;color:#64748b;line-height:1.6;max-width:360px;margin:0 auto">
+            Ta clé SSH a été copiée sur le serveur.<br>
+            @if (qc.alias) {
+              Tu peux maintenant te connecter avec :<br>
+              <code style="color:#4ade80;font-size:0.95rem">ssh {{ qc.alias }}</code>
+            }
+          </div>
+          <div style="margin-top:24px">
+            <p-button label="Fermer" icon="pi pi-times" (onClick)="showQuickConnect=false"></p-button>
+          </div>
+        </div>
+      }
+
+    </p-dialog>
 
     <!-- ─── Dialog Gérer l'accès SSH ─────────────────────────────────────── -->
     <p-dialog
@@ -243,10 +445,20 @@ import { ApiService, Host, SshKey } from '../../services/api.service';
                 <div class="dlg-hint">Colle la clé publique de la machine qui doit avoir accès (contenu du fichier .pub).</div>
               </div>
 
-              <div style="background:#13161e;border:1px solid #1a1e2a;border-radius:8px;padding:12px;font-size:0.78rem;color:#475569;margin-top:4px">
-                <div style="color:#94a3b8;font-weight:600;margin-bottom:6px">Connexion via :</div>
-                <div style="font-family:monospace;color:#818cf8">{{ selectedHost()?.deployUser || 'root' }}@{{ selectedHost()?.ip }}:{{ selectedHost()?.sshPort || selectedHost()?.rootPort }}</div>
-                <div style="margin-top:4px">Clé privée : <code style="color:#4ade80">{{ selectedHost()?.privateKeyPath || '~/.ssh/id_ed25519' }}</code></div>
+              <div class="field-row" style="margin-top:12px">
+                <div class="dlg-field">
+                  <span class="dlg-label">Utilisateur</span>
+                  <input pInputText [(ngModel)]="addKeyConn.user" placeholder="deploy" />
+                </div>
+                <div class="dlg-field">
+                  <span class="dlg-label">Port SSH</span>
+                  <input pInputText [(ngModel)]="addKeyConn.port" type="number" placeholder="22" />
+                  <div class="dlg-hint">Port actuel du serveur (22 si Ansible n'a pas tourné)</div>
+                </div>
+              </div>
+              <div class="dlg-field">
+                <span class="dlg-label">Clé privée locale</span>
+                <input pInputText [(ngModel)]="addKeyConn.privateKeyPath" style="font-family:monospace;width:100%" placeholder="~/.ssh/id_ed25519" />
               </div>
 
               @if (addKeyMsg()) {
@@ -274,6 +486,97 @@ export class DashboardComponent implements OnInit {
   activeTab = 'config';
   manageDialogHeader = '';
 
+  // ─── Choose dialog ────────────────────────────────────────────────────────
+  showChooseDialog = false;
+  openChoose() { this.showChooseDialog = true; }
+  chooseNew()  { this.showChooseDialog = false; this.router.navigate(['/setup']); }
+  chooseConnect() {
+    this.showChooseDialog = false;
+    this.qcStep = 0;
+    this.qc = { host: '', port: 22, user: 'root', password: '', selectedKey: null, alias: '', privateKeyPath: '~/.ssh/id_ed25519' };
+    this.qcMsg.set(''); this.qcError.set(false);
+    this.api.getSshKeys().subscribe({ next: k => this.sshKeys.set(k) });
+    this.showQuickConnect = true;
+  }
+
+  // ─── Quick-connect dialog ─────────────────────────────────────────────────
+  showQuickConnect = false;
+  qcStep = 0;
+  sshKeys = signal<SshKey[]>([]);
+  qc: { host: string; port: number; user: string; password: string; selectedKey: SshKey | null; alias: string; privateKeyPath: string } = {
+    host: '', port: 22, user: 'root', password: '', selectedKey: null, alias: '', privateKeyPath: '~/.ssh/id_ed25519'
+  };
+  qcLoading = signal(false);
+  qcMsg = signal('');
+  qcError = signal(false);
+
+  qcAlias() { return this.qc.alias || 'mon_vps'; }
+  qcConfigPreview() {
+    return [
+      `Host ${this.qcAlias()}`,
+      `    HostName ${this.qc.host}`,
+      `    User ${this.qc.user}`,
+      `    Port ${this.qc.port}`,
+      `    IdentityFile ${this.qc.privateKeyPath || '~/.ssh/id_ed25519'}`,
+    ].join('\n');
+  }
+
+  qcTest() {
+    if (!this.qc.host || !this.qc.password) return;
+    this.qcLoading.set(true); this.qcMsg.set(''); this.qcError.set(false);
+    this.api.testSsh({ host: this.qc.host, port: this.qc.port, username: this.qc.user, password: this.qc.password }).subscribe({
+      next: () => {
+        this.qcLoading.set(false);
+        this.qcMsg.set('Connexion réussie !');
+        setTimeout(() => { this.qcMsg.set(''); this.qcStep = 1; }, 800);
+      },
+      error: err => {
+        this.qcLoading.set(false); this.qcError.set(true);
+        this.qcMsg.set(err.error?.error || 'Connexion impossible');
+      }
+    });
+  }
+
+  qcCopyKey() {
+    if (!this.qc.selectedKey) return;
+    this.qcLoading.set(true); this.qcMsg.set(''); this.qcError.set(false);
+    this.api.copyKey({
+      host: this.qc.host, port: this.qc.port, username: this.qc.user, password: this.qc.password,
+      publicKey: this.qc.selectedKey.content
+    }).subscribe({
+      next: () => {
+        this.qcLoading.set(false);
+        // Derive a default alias from the key name without extension
+        if (!this.qc.alias) {
+          this.qc.alias = this.qc.host.replace(/\./g, '_');
+          // Use private key path matching the selected pub key
+          this.qc.privateKeyPath = this.qc.selectedKey?.path.replace(/\.pub$/, '') || '~/.ssh/id_ed25519';
+        }
+        this.qcMsg.set(''); this.qcStep = 2;
+      },
+      error: err => {
+        this.qcLoading.set(false); this.qcError.set(true);
+        this.qcMsg.set(err.error?.error || 'Erreur lors de la copie de la clé');
+      }
+    });
+  }
+
+  qcSaveAlias() {
+    if (!this.qc.alias) return;
+    this.qcLoading.set(true); this.qcMsg.set(''); this.qcError.set(false);
+    this.api.addSshConfig({
+      alias: this.qc.alias, hostname: this.qc.host,
+      user: this.qc.user, port: Number(this.qc.port),
+      identityFile: this.qc.privateKeyPath
+    }).subscribe({
+      next: () => { this.qcLoading.set(false); this.qcStep = 3; },
+      error: err => {
+        this.qcLoading.set(false); this.qcError.set(true);
+        this.qcMsg.set(err.error?.error || 'Erreur d\'écriture dans ~/.ssh/config');
+      }
+    });
+  }
+
   // SSH Config form
   sshForm = { alias: '', hostname: '', user: '', port: 22, identityFile: '' };
   sshConfigLoading = signal(false);
@@ -282,6 +585,7 @@ export class DashboardComponent implements OnInit {
 
   // Add key form
   newKeyForm = { publicKey: '' };
+  addKeyConn = { user: 'deploy', port: 22, privateKeyPath: '~/.ssh/id_ed25519' };
   addKeyLoading = signal(false);
   addKeyMsg = signal('');
   addKeyError = signal(false);
@@ -301,6 +605,7 @@ export class DashboardComponent implements OnInit {
 
   goToSetup() { this.router.navigate(['/setup']); }
 
+
   continueSetup(host: Host) {
     this.router.navigate(['/setup'], { queryParams: { hostId: host.id } });
   }
@@ -317,8 +622,13 @@ export class DashboardComponent implements OnInit {
       alias: host.label.toLowerCase().replace(/[^a-z0-9]/g, '_'),
       hostname: host.ip,
       user: host.deployUser || 'deploy',
-      port: host.sshPort || 1024,
+      port: host.sshPort || 22,
       identityFile: host.privateKeyPath || '~/.ssh/id_ed25519'
+    };
+    this.addKeyConn = {
+      user: host.deployUser || 'deploy',
+      port: host.sshPort || 22,
+      privateKeyPath: host.privateKeyPath || '~/.ssh/id_ed25519'
     };
     this.showManageDialog = true;
   }
@@ -375,9 +685,9 @@ export class DashboardComponent implements OnInit {
     this.addKeyMsg.set('');
     this.api.addAuthorizedKey({
       host: h.ip,
-      port: h.sshPort || h.rootPort,
-      username: h.deployUser || 'root',
-      privateKeyPath: h.privateKeyPath || '~/.ssh/id_ed25519',
+      port: Number(this.addKeyConn.port) || 22,
+      username: this.addKeyConn.user || h.deployUser || 'root',
+      privateKeyPath: this.addKeyConn.privateKeyPath || h.privateKeyPath || '~/.ssh/id_ed25519',
       newPublicKey: this.newKeyForm.publicKey.trim()
     }).subscribe({
       next: () => {

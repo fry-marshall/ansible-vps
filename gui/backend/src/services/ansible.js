@@ -1,9 +1,24 @@
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
 const ANSIBLE_DIR = path.resolve(__dirname, '../../../../ansible');
 const LOGS_DIR = path.resolve(__dirname, '../../logs');
+const DATA_FILE = path.resolve(__dirname, '../../data/hosts.json');
+const VAULT_FILE = path.join(ANSIBLE_DIR, 'group_vars/vps/vault.yml');
+
+function ensureVault(socket) {
+  if (fs.existsSync(VAULT_FILE)) return;
+  // Create minimal vault with placeholder SMTP — pubkey is now in vars.yml
+  const vaultContent = [
+    'vault_smtp_user: changeme@gmail.com',
+    'vault_smtp_password: changeme',
+    'vault_alert_email: changeme@gmail.com',
+  ].join('\n') + '\n';
+  fs.writeFileSync(VAULT_FILE, vaultContent, { mode: 0o600 });
+  socket.emit('job:output', { type: 'stdout', text: '[setup] vault.yml créé avec des valeurs SMTP placeholder\n' });
+}
 
 if (!fs.existsSync(LOGS_DIR)) fs.mkdirSync(LOGS_DIR, { recursive: true });
 
@@ -101,6 +116,7 @@ function runAnsible(command, args, socket, jobId, vaultPassword = null) {
 
 function setupDeploySocket(socket, io) {
   socket.on('deploy:run', ({ jobId, tags, vaultPassword, checkMode }) => {
+    ensureVault(socket);
     const args = ['-i', 'inventory.ini', 'playbook.yml'];
     if (tags && tags.length) args.push('--tags', tags.join(','));
     if (checkMode) args.push('--check');

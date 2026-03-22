@@ -18,5 +18,6 @@ smtp_user: "{{ vault_smtp_user }}"
 smtp_password: "{{ vault_smtp_password }}"
 alert_email: "{{ vault_alert_email }}"
 
-# SSH public key for the deploy user (not a secret)
-deploy_user_pubkey: "{{ vault_deploy_user_pubkey }}"
+# SSH public key for the deploy user
+# This is written automatically by the GUI backend — you don't need to edit it manually
+deploy_user_pubkey: "ssh-ed25519 AAAA... your@machine"
