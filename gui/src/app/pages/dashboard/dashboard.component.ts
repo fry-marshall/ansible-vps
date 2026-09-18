@@ -53,6 +53,8 @@ import { PasswordModule } from 'primeng/password';
 
     /* Choose dialog */
     .choose-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:8px; }
+    .choose-card.full { grid-column:1 / -1; display:flex; align-items:center; gap:16px; text-align:left; padding:16px 20px; }
+    .choose-card.full .icon { margin:0; flex-shrink:0; }
     .choose-card { border:2px solid #1a1e2a; border-radius:14px; padding:28px 20px; text-align:center; cursor:pointer; transition:all 0.15s; background:#0d0f14; }
     .choose-card:hover { border-color:#6366f1; background:rgba(99,102,241,0.05); }
     .choose-card .icon { width:56px; height:56px; border-radius:14px; display:flex; align-items:center; justify-content:center; margin:0 auto 16px; }
@@ -195,6 +197,70 @@ import { PasswordModule } from 'primeng/password';
           <h3>VPS déjà configuré</h3>
           <p>Mon VPS tourne déjà. Je veux juste y connecter cette machine (copier ma clé SSH + alias).</p>
         </div>
+        <div class="choose-card full" (click)="chooseAttach()">
+          <div class="icon" style="background:rgba(245,158,11,0.1)">
+            <i class="pi pi-refresh" style="font-size:1.3rem;color:#f59e0b"></i>
+          </div>
+          <div>
+            <h3 style="margin:0 0 4px">Réattacher un host existant (clé de secours)</h3>
+            <p>Le VPS est déjà durci (root désactivé) et j'ai déjà une clé qui fonctionne — je veux juste l'enregistrer ici, sans repasser par le wizard root.</p>
+          </div>
+        </div>
+      </div>
+    </p-dialog>
+
+    <!-- ─── Dialog Réattacher un host existant ─────────────────────────────── -->
+    <p-dialog
+      [(visible)]="showAttachDialog"
+      [modal]="true"
+      [style]="{ width: '540px' }"
+      header="Réattacher un host existant"
+      [draggable]="false"
+      [resizable]="false">
+
+      <p style="font-size:0.85rem;color:#64748b;margin:0 0 20px">
+        Pour le cas où root est désactivé et où tu as déjà une clé qui fonctionne (backup, autre machine déjà autorisée).
+        On vérifie la connexion par clé, puis on enregistre le host directement comme "configuré", sans passer par le wizard.
+      </p>
+
+      <div class="field-row">
+        <div class="dlg-field">
+          <span class="dlg-label">Adresse IP</span>
+          <input pInputText [(ngModel)]="attachForm.ip" placeholder="1.2.3.4" style="font-family:monospace" />
+        </div>
+        <div class="dlg-field">
+          <span class="dlg-label">Label (optionnel)</span>
+          <input pInputText [(ngModel)]="attachForm.label" placeholder="ex: VPS OVH prod" />
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="dlg-field">
+          <span class="dlg-label">Utilisateur</span>
+          <input pInputText [(ngModel)]="attachForm.deployUser" placeholder="deploy" />
+        </div>
+        <div class="dlg-field">
+          <span class="dlg-label">Port SSH</span>
+          <input pInputText [(ngModel)]="attachForm.sshPort" type="number" placeholder="1024" />
+        </div>
+      </div>
+
+      <div class="dlg-field">
+        <span class="dlg-label">Clé privée de secours</span>
+        <input pInputText [(ngModel)]="attachForm.privateKeyPath" style="font-family:monospace;width:100%" placeholder="~/.ssh/id_ed25519_backup" />
+        <div class="dlg-hint">Le chemin sur cette machine vers la clé qui fonctionne déjà.</div>
+      </div>
+
+      @if (attachMsg()) {
+        <div class="alert" [class.alert-success]="!attachError()" [class.alert-error]="attachError()">
+          <i class="pi" [class.pi-check-circle]="!attachError()" [class.pi-times-circle]="attachError()" style="margin-right:8px"></i>
+          {{ attachMsg() }}
+        </div>
+      }
+
+      <div style="display:flex;justify-content:space-between;gap:8px;margin-top:20px">
+        <p-button label="Tester la connexion" icon="pi pi-bolt" severity="secondary" [outlined]="true" [loading]="attachLoading()" (onClick)="attachTest()"></p-button>
+        <p-button label="Enregistrer" icon="pi pi-check" [loading]="attachLoading()" [disabled]="!attachVerified()" (onClick)="attachSave()"></p-button>
       </div>
     </p-dialog>
 
@@ -497,6 +563,73 @@ export class DashboardComponent implements OnInit {
     this.qcMsg.set(''); this.qcError.set(false);
     this.api.getSshKeys().subscribe({ next: k => this.sshKeys.set(k) });
     this.showQuickConnect = true;
+  }
+
+  // ─── Attach existing host dialog (recovery: root disabled, backup key already works) ──
+  showAttachDialog = false;
+  attachForm = { ip: '', label: '', deployUser: 'deploy', sshPort: 1024, privateKeyPath: '' };
+  attachLoading = signal(false);
+  attachMsg = signal('');
+  attachError = signal(false);
+  attachVerified = signal(false);
+
+  chooseAttach() {
+    this.showChooseDialog = false;
+    this.attachForm = { ip: '', label: '', deployUser: 'deploy', sshPort: 1024, privateKeyPath: '' };
+    this.attachMsg.set(''); this.attachError.set(false); this.attachVerified.set(false);
+    this.showAttachDialog = true;
+  }
+
+  attachTest() {
+    const f = this.attachForm;
+    if (!f.ip || !f.privateKeyPath) {
+      this.attachError.set(true);
+      this.attachMsg.set('IP et chemin de clé privée requis');
+      return;
+    }
+    this.attachLoading.set(true); this.attachMsg.set(''); this.attachError.set(false); this.attachVerified.set(false);
+    this.api.verifyKey({
+      host: f.ip, port: Number(f.sshPort) || 1024,
+      username: f.deployUser || 'deploy', privateKeyPath: f.privateKeyPath
+    }).subscribe({
+      next: res => {
+        this.attachLoading.set(false);
+        if (res.ok) {
+          this.attachVerified.set(true);
+          this.attachMsg.set('Connexion réussie — tu peux enregistrer ce host.');
+        } else {
+          this.attachError.set(true);
+          this.attachMsg.set('Connexion refusée par le serveur.');
+        }
+      },
+      error: err => {
+        this.attachLoading.set(false); this.attachError.set(true);
+        this.attachMsg.set(err.error?.error || 'Connexion impossible');
+      }
+    });
+  }
+
+  attachSave() {
+    if (!this.attachVerified()) return;
+    const f = this.attachForm;
+    this.attachLoading.set(true);
+    this.api.attachHost({
+      ip: f.ip, label: f.label.trim() || f.ip,
+      deployUser: f.deployUser || 'deploy',
+      sshPort: Number(f.sshPort) || 1024,
+      privateKeyPath: f.privateKeyPath
+    }).subscribe({
+      next: host => {
+        this.attachLoading.set(false);
+        this.showAttachDialog = false;
+        this.hosts.update(h => [...h, host]);
+        this.msg.add({ severity: 'success', summary: 'Host réattaché', detail: `${host.label} enregistré` });
+      },
+      error: err => {
+        this.attachLoading.set(false); this.attachError.set(true);
+        this.attachMsg.set(err.error?.error || 'Erreur lors de l\'enregistrement');
+      }
+    });
   }
 
   // ─── Quick-connect dialog ─────────────────────────────────────────────────

@@ -14,12 +14,18 @@
     default: allow
     direction: outgoing
 
-- name: Allow configured ports
+- name: Rate-limit SSH port (blocks an IP after 6 attempts / 30s at the kernel level)
+  ufw:
+    rule: limit
+    port: "{{ ssh_port | string }}"
+    proto: tcp
+
+- name: Allow other configured ports
   ufw:
     rule: allow
     port: "{{ item }}"
     proto: tcp
-  loop: "{{ allowed_ports }}"
+  loop: "{{ allowed_ports | reject('equalto', ssh_port | string) | list }}"
 
 - name: Enable UFW
   ufw:

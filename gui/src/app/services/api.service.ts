@@ -41,6 +41,7 @@ export class ApiService {
 
   getHosts(): Observable<Host[]> { return this.http.get<Host[]>(`${API_URL}/hosts`); }
   addHost(data: { ip: string; label?: string; rootPort?: number }): Observable<Host> { return this.http.post<Host>(`${API_URL}/hosts`, data); }
+  attachHost(data: { ip: string; label?: string; deployUser: string; sshPort: number; privateKeyPath: string }): Observable<Host> { return this.http.post<Host>(`${API_URL}/hosts/attach`, data); }
   updateHost(id: string, data: Partial<Host>): Observable<Host> { return this.http.patch<Host>(`${API_URL}/hosts/${id}`, data); }
   deleteHost(id: string): Observable<any> { return this.http.delete(`${API_URL}/hosts/${id}`); }
 

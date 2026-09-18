@@ -92,6 +92,34 @@ router.post('/', (req, res) => {
   res.json(host);
 });
 
+// POST réattacher un hôte déjà durci (ex: clé de secours) sans repasser par le wizard root
+router.post('/attach', (req, res) => {
+  const { ip, label, deployUser = 'deploy', sshPort = 1024, privateKeyPath } = req.body;
+  if (!ip || !privateKeyPath) {
+    return res.status(400).json({ error: 'IP et chemin de clé privée requis' });
+  }
+
+  const hosts = loadHosts();
+  if (hosts.find(h => h.ip === ip)) {
+    return res.status(409).json({ error: 'Hôte déjà existant' });
+  }
+
+  const host = {
+    id: `host-${Date.now()}`,
+    ip,
+    label: label || ip,
+    rootPort: 22,
+    status: 'configured',
+    deployUser,
+    sshPort: Number(sshPort),
+    privateKeyPath,
+    createdAt: new Date().toISOString(),
+  };
+  hosts.push(host);
+  saveHosts(hosts);
+  res.json(host);
+});
+
 // PATCH mettre à jour le statut / les infos d'un hôte
 router.patch('/:id', (req, res) => {
   const hosts = loadHosts();

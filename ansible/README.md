@@ -104,6 +104,33 @@ make vault-encrypt # Re-encrypt the vault after manual edits
 | Unnoticed intrusions | Email alert on every SSH login |
 | Open ports | UFW: deny all incoming except SSH, HTTP, HTTPS |
 
+### Recovery / break-glass access
+
+If you lose the `deploy` private key (or the machine holding it) and no other key is
+authorized on the server, SSH access to the VPS is gone — but the server itself is not
+lost.
+
+0. **You still have a working key somewhere** — a backup copy of the `deploy` private
+   key (password manager, encrypted backup, another already-authorized device). If so,
+   just `ssh -p 1024 deploy@<ip>` from there and fix whatever's needed (add a new key,
+   restore your main machine's access) directly — no need for anything below.
+
+If that's not the case either, this setup runs on **Hostinger**, which provides
+out-of-band recovery via hPanel (does not depend on SSH or the `deploy` key):
+
+1. **Web Console** — hPanel → VPS → Manage → *Web Console* (top right). Opens a
+   browser-based noVNC terminal straight into the VPS, bypassing SSH entirely. Use it to
+   fix `authorized_keys` or `sshd_config` manually.
+2. **Reset SSH** — hPanel → Settings → SSH configuration → *Reset SSH*. Restores
+   `/etc/ssh/sshd_config` to Hostinger's default (this undoes the hardening from `ssh.yml`
+   — root login/password auth come back — so only use it to regain access, then re-run
+   `make deploy` to re-harden).
+3. **Emergency Mode** — hPanel → Emergency mode tab, if the VPS doesn't respond at all
+   (e.g. filesystem corruption). Boots into a rescue environment mounted at `/mnt`.
+
+Since Hostinger's hPanel becomes the real "master key" to the server, make sure your
+Hostinger account itself has 2FA enabled.
+
 ### Known trade-offs
 
 - **`NOPASSWD sudo`** — the `deploy` user has full sudo without a password. Convenient for automation, but if the SSH key is compromised, the attacker has root. Protect your private key.
